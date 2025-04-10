@@ -31,13 +31,29 @@ def formatdate(strdate):
     return datetime.strptime(strdate, "%b %d, %Y %I:%M:%S %p").strftime("%Y-%m-%d %H:%M:%S")
 
 
-def main(opts):
-    response = requests.get('https://go.smitechow.com/www.fjdzj.gov.cn/quakesearch.htm?time=oneday&sort=4,1')
+def get_data(s, n=1):
+    response = s.get(f'https://go.smitechow.com/www.fjdzj.gov.cn/quakesearch.htm?time=oneday&sort=4,1&n={n}')
     content = response.text
     idx_start = content.index("eval('[")
     idx_end = content.index("]');")
     json_str = content[idx_start+6:idx_end+1]
     data = json.loads(json_str)
+
+    if len(data) == 10:
+        return data + get_data(s, n + 1)
+    return data
+
+
+def main(opts):
+    s = requests.Session()
+    retries = Retry(
+        total=3,  # 总重试次数
+        backoff_factor=1,  # 间隔时间因子，用于计算重试间隔时间
+        status_forcelist=[101, 104],  # 遇到这些状态码时会触发重试
+        allowed_methods=["GET"]  # 允许重试的方法
+    )
+    s.mount('https://', HTTPAdapter(max_retries=retries))
+    data = get_data(s)
 
     new_id = []
     old_id = []
