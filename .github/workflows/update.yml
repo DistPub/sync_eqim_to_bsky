@@ -1,4 +1,4 @@
-name: update 163 news
+name: update eqim report
 on:
   workflow_dispatch:
 jobs:
