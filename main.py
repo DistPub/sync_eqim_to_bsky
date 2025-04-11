@@ -34,8 +34,13 @@ def formatdate(strdate):
 def get_data(s, n=1):
     response = s.get(f'https://go.smitechow.com/www.fjdzj.gov.cn/quakesearch.htm?time=oneday&sort=4,1&n={n}')
     content = response.text
-    idx_start = content.index("eval('[")
-    idx_end = content.index("]');")
+    try:
+        idx_start = content.index("eval('[")
+        idx_end = content.index("]');")
+    except ValueError:
+        print(f'not find data, {content}')
+        return []
+        
     json_str = content[idx_start+6:idx_end+1]
     data = json.loads(json_str)
 
