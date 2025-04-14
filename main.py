@@ -16,6 +16,22 @@ with open('oneday.json') as f:
     oneday = json.loads(f.read())
 
 
+def action_in_progress(token):
+    url = 'https://api.github.com/repos/DistPub/sync_eqim_to_bsky/actions/runs'
+    path = 'update.yml'
+    response = requests.get(url, headers={
+        'Authorization': f'token {token}'
+    }, params={'status': 'in_progress'})
+    data = response.json()
+    status_mismatch_ids = [
+    ]
+    runs = [item for item in data['workflow_runs'] if item['path'].endswith(path) and item['id'] not in status_mismatch_ids]
+    if len(runs) < 2:
+        return False
+
+    return True
+
+
 def git_commit():
     os.system('git config --global user.email "xiaopengyou@live.com"')
     os.system('git config --global user.name "robot auto"')
@@ -50,6 +66,10 @@ def get_data(s, n=1):
 
 
 def main(opts):
+    if not opts.dev and action_in_progress(opts.gh_token):
+        print(f'action in progress, skip')
+        return
+        
     s = requests.Session()
     retries = Retry(
         total=3,  # 总重试次数
@@ -147,6 +167,7 @@ if __name__ == '__main__':
     parser.add_argument("--service", help="PDS endpoint")
     parser.add_argument("--username", help="account username")
     parser.add_argument("--password", help="account password")
+    parser.add_argument("--gh-token", help="gh token")
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
     main(args)
