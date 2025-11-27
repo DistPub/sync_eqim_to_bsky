@@ -11,6 +11,28 @@ import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
+import base64
+import json
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
+
+def decrypt_aes_base64(e: str,
+                       key: str = "wenhePiCloudSecr",
+                       iv:  str = "wenhePiCloudSecr"):
+    """
+    解密 AES-CBC-PKCS7，输入 Base64 密文，返回原文（能 JSON 则 dict，否则 str）
+    """
+    key_b = key.encode('utf-8')[:16]
+    iv_b  = iv.encode('utf-8')[:16]
+
+    cipher = AES.new(key_b, AES.MODE_CBC, iv_b)
+    try:
+        ct = base64.b64decode(e)
+        pt = unpad(cipher.decrypt(ct), AES.block_size).decode('utf-8')
+        return json.loads(pt)
+    except Exception as exc:
+        raise Exception(f'decode error: {exc}')
+
 
 with open('oneday.json') as f:
     oneday = json.loads(f.read())
@@ -48,19 +70,22 @@ def formatdate(strdate):
 
 
 def get_data(s, n=1):
-    response = s.get(f'https://go.smitechow.com/www.fjdzj.gov.cn/quakesearch.htm?time=oneday&sort=4,1&n={n}')
-    content = response.text
-    try:
-        idx_start = content.index("eval('[")
-        idx_end = content.index("]');")
-    except ValueError:
-        print(f'not find data, {content}')
-        return []
-        
-    json_str = content[idx_start+6:idx_end+1]
-    data = json.loads(json_str)
+    now = datetime.now()
+    before = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    after = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+    response = s.get((f'https://go.smitechow.com/www.fjdzj.gov.cn/api/home/obtain_earthquake_data?'
+                      f'pageNum={n}&pageSize=30&'
+                      f'timeRange={before},{after}'
+                      f'&type=eqr'))
+    response.raise_for_status()
+    content = response.json()
+    if content['code'] != 200:
+        raise Exception(f'get data error: {content}')
 
-    if len(data) == 10:
+    data = decrypt_aes_base64(content['msg'])
+    data = data['list']
+
+    if len(data) == 30:
         return data + get_data(s, n + 1)
     return data
 
@@ -84,32 +109,42 @@ def main(opts):
     old_id = []
     for item in data:
         def val(name):
-            return item[name][0]['value']
+            return item[name]
 
         if val('id') in oneday:
-            old_id.append(item['id'][0]['value'])
+            old_id.append(val('id'))
             continue
 
-        if val('S_msgType') == '0':
-            cate = '中国地震台网自动测定'
+        if val('access_msg_type_text') != '正式报':
+            cate = f'中国地震台网自动测定'
         else:
             cate = '中国地震台网正式测定'
 
+        if val('lat')[0] == '-':
+            weidu = f'南纬{val("lat")[1:]}度'
+        else:
+            weidu = f'北纬{val("lat")}度'
+
+        if val('lng')[0] == '-':
+            jingdu = f'西经{val("lng")[1:]}度'
+        else:
+            jingdu = f'东经{val("lng")}度'
+
         news = {
-            'quakeTime': formatdate(val('quakeTime')),
-            'longitude': val('longitude'),
-            'latitude': val('latitude'),
-            'location': val('location'),
-            'focalDepth': val('focalDepth'),
-            'level': val('level'),
+            'quakeTime': val('oritime'),
+            'longitude': val('lng'),
+            'latitude': val('lat'),
+            'location': val('locname'),
+            'focalDepth': val('s_depth'),
+            'level': val('magnitude'),
 
             'id': val('id'),
-            'title': val('title'),
-            'content': val('content'),
-            'time': formatdate(val('pubDate')),
+            'title': f'{val("locname")}发生{val("magnitude")}级地震',
+            'content': f'{cate}：{val("oritime")}，在{val("locname")}（{weidu},{jingdu}）发生{val("magnitude")}级地震，震源深度{val("s_depth")}千米。',
+            'time': val('sendtime'),
             'source': f'国家地震科学数据中心',
             # 中国地震台网地震速报
-            'tags': ['地震速报', cate, f'{val("location")}地震'],
+            'tags': ['地震速报', cate, f'{val("locname")}地震'],
         }
         params = {
             'title': news['title'],
