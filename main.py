@@ -84,7 +84,7 @@ def get_data(s, n=1):
 
     data = decrypt_aes_base64(content['msg'])
     data = data['list']
-    data.reverse()
+    
 
     if len(data) == 30:
         return data + get_data(s, n + 1)
@@ -105,6 +105,7 @@ def main(opts):
     )
     s.mount('https://', HTTPAdapter(max_retries=retries))
     data = get_data(s)
+    data.reverse()
 
     new_id = []
     old_id = []
