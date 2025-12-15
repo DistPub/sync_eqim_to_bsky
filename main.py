@@ -77,6 +77,10 @@ def get_data(s, n=1):
                       f'pageNum={n}&pageSize=30&'
                       f'timeRange={before},{after}'
                       f'&type=eqr'))
+    if response.status_code >=500:
+        # server error not our business
+        return []
+    
     response.raise_for_status()
     content = response.json()
     if content['code'] != 200:
