@@ -174,7 +174,9 @@ def main(opts):
 
     print(f'there are {len(new_id)} need to post')
     client = Client(base_url=opts.service if opts.service != 'default' else None)
-    client.login(opts.username, opts.password)
+    session = client._get_and_set_session(opts.username, opts.password)
+    client.me = client.app.bsky.actor.get_profile(models.AppBskyActorGetProfile.Params(actor=session.handle), headers={'atproto-proxy': 'did:web:fatesky.hukoubook.com#fatesky_appview'})
+
     post_status_error = False
     sended_id = []
     for post in new_id:
