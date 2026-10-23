@@ -179,7 +179,12 @@ def main(opts):
 
     post_status_error = False
     sended_id = []
+    seen_content = []
     for post in new_id:
+        if post['content'] in seen_content:
+            sended_id.append(post['id'])
+            continue
+        seen_content.append(post['content'])
         embed = models.AppBskyEmbedExternal.Main(
             external=models.AppBskyEmbedExternal.External(
                 title=post['title'],
