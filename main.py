@@ -77,7 +77,7 @@ def get_data(s, n=1):
                       f'pageNum={n}&pageSize=30&'
                       f'timeRange={before},{after}'
                       f'&type=eqr'))
-    if response.status_code >=500:
+    if response.status_code >=500 or response.status_code == 429:
         # server error not our business
         return []
     
